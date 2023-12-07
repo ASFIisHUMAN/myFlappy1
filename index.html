@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flappy Bird</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    #gameCanvas, #backgroundCanvas {
+      display: block;
+      position: absolute;
+    }
+    #gameCanvas {
+      z-index: 1;
+    }
+    #backgroundCanvas {
+      z-index: 0;
+    }
+    #gameOverScreen {
+      display: none;
+      position: absolute;
+      background-color: rgba(255, 218, 218, 0.8);
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+      z-index: 2;
+    }
+    .btov{
+      height: 40px;
+      text-align: center;
+      background-image: linear-gradient(to bottom right,rgb(17, 129, 92),rgb(110, 64, 136));
+      border-radius: 10px;
+      border: none;
+      color: rgb(217, 243, 247);
+      font-size: larger;
+    }
+    #scoreText{
+      font-weight: 400;
+      font-size: x-large;
+      color: rgb(5, 80, 11);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="backgroundCanvas"></canvas>
+  <canvas id="gameCanvas"></canvas>
+  <div id="gameOverScreen">
+    <b><i><h1>Game Over!</h1><h3> Better luck next time...</h3></i></b>
+    <i><p id="scoreText"></p></i>
+    <button class="btov" onclick="restartGame()"><i>Restart</i></button>
+  </div>
+  <script>
+    const backgroundCanvas = document.getElementById('backgroundCanvas');
+    const backgroundCtx = backgroundCanvas.getContext('2d');
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    const scoreText = document.getElementById('scoreText');
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    backgroundCanvas.width = window.innerWidth;
+    backgroundCanvas.height = window.innerHeight;
+
+    // Game state flag
+    let gameRunning = true;
+
+    // Bird
+    const bird = {
+      x: 50,
+      y: canvas.height / 2 - 15,
+      width: 30,
+      height: 30,
+      image: new Image(),
+      gravity: 0.2,
+      velocity: 0,
+      jump: -5,
+      descent: 6,
+    };
+
+    // Set the bird image source
+    bird.image.onload = initializeGame;
+    bird.image.src = 'bird2.png';
+
+    // Pipes
+    const pipes = [];
+    const pipeWidth = 50;
+    let pipeGap = 250;
+    let pipeSpeed = 3;
+    const pipeSpawnInterval = 1850;
+    const maxPipeHeight = canvas.height - pipeGap - 50;
+    const minPipeHeight = 50;
+
+    let score = 0;
+    let difficultyMultiplier = 1;
+
+    // Bubbles
+    const bubbles = [];
+
+    function initializeGame() {
+      // Add event listeners and start the game loop
+      document.addEventListener('keydown', function (event) {
+        if (event.code === 'Space') {
+          flap();
+        } else if (event.code === 'ArrowDown') {
+          descend();
+        }
+      });
+
+      document.addEventListener('click', flap);
+
+      setInterval(createPipe, pipeSpawnInterval);
+      setInterval(() => {
+        difficultyMultiplier += 0.1;
+        if (score >= 10) {
+          pipeSpeed = 3.4;
+          pipeGap = 242;
+        }
+        if (score >= 21) {
+          pipeSpeed = 3.8;
+          pipeGap = 235;
+        }
+        if (score >= 35) {
+          pipeSpeed = 4.1;
+          pipeGap = 225;
+        }
+        if (score >= 57) {
+          pipeSpeed = 4.4;
+          pipeGap = 220;
+        }
+        if (score >= 20) {
+          pipeSpeed = 4.7;
+          pipeGap = 210;
+        }
+      }, 10000);
+
+      // Initialize bubbles
+      for (let i = 0; i < 20; i++) {
+        bubbles.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          radius: Math.random() * 10 + 5,
+          speed: Math.random() * 2 + 1,
+        });
+      }
+
+      draw();
+    }
+
+    function drawBackground() {
+      // Animated water background
+      const waterGradient = backgroundCtx.createLinearGradient(0, 0, 0, canvas.height);
+      waterGradient.addColorStop(0, '#87CEEB');
+      waterGradient.addColorStop(1, '#5CACEE');
+
+      backgroundCtx.fillStyle = waterGradient;
+      backgroundCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Draw flow lines
+      backgroundCtx.beginPath();
+      backgroundCtx.moveTo(0, canvas.height * 0.8);
+      for (let i = 0; i < canvas.width; i += 20) {
+        backgroundCtx.lineTo(i, canvas.height * 0.8 + Math.sin(i * 0.02) * 20);
+      }
+      backgroundCtx.lineTo(canvas.width, canvas.height);
+      backgroundCtx.lineTo(0, canvas.height);
+      backgroundCtx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      backgroundCtx.fill();
+
+      // Draw bubbles
+      for (const bubble of bubbles) {
+        backgroundCtx.beginPath();
+        backgroundCtx.arc(bubble.x, bubble.y, bubble.radius, 0, Math.PI * 2);
+        backgroundCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        backgroundCtx.fill();
+      }
+    }
+
+    function drawBird() {
+      ctx.drawImage(bird.image, bird.x, bird.y, bird.width+10, bird.height+10);
+    }
+
+    function drawPipe(x, height) {
+      const spikeLength = 20;
+      const spikeWidth = 5;
+      const miniSpikeHeight = 10;
+      const miniSpikeWidth = 2;
+
+      // Draw main spike
+      ctx.fillStyle = 'white';
+      ctx.fillRect(x, 0, pipeWidth, height);
+
+      // Draw mini spikes on the body
+      for (let i = 0; i < height / miniSpikeHeight; i++) {
+        const miniSpikeX = x + pipeWidth / 2 - miniSpikeWidth / 2;
+        const miniSpikeY = i * miniSpikeHeight;
+        ctx.fillStyle = 'white';
+        ctx.fillRect(miniSpikeX, miniSpikeY, miniSpikeWidth, miniSpikeHeight);
+      }
+
+      // Draw bottom spike
+      ctx.beginPath();
+      ctx.moveTo(x, height);
+      ctx.lineTo(x + pipeWidth / 2, height + spikeLength);
+      ctx.lineTo(x + pipeWidth, height);
+      ctx.closePath();
+      ctx.fillStyle = 'white';
+      ctx.fill();
+    }
+
+    function drawBottomPipe(x, height) {
+      const spikeLength = 20;
+      const spikeWidth = 5;
+      const miniSpikeHeight = 10;
+      const miniSpikeWidth = 2;
+
+      // Draw main spike
+      ctx.fillStyle = 'white';
+      ctx.fillRect(x, height, pipeWidth, canvas.height - height);
+
+      // Draw mini spikes on the body
+      for (let i = 0; i < (canvas.height - height) / miniSpikeHeight; i++) {
+        const miniSpikeX = x + pipeWidth / 2 - miniSpikeWidth / 2;
+        const miniSpikeY = height + i * miniSpikeHeight;
+        ctx.fillStyle = 'white';
+        ctx.fillRect(miniSpikeX, miniSpikeY, miniSpikeWidth, miniSpikeHeight);
+      }
+
+      // Draw top spike
+      ctx.beginPath();
+      ctx.moveTo(x, height);
+      ctx.lineTo(x + pipeWidth / 2, height - spikeLength);
+      ctx.lineTo(x + pipeWidth, height);
+      ctx.closePath();
+      ctx.fillStyle = 'white';
+      ctx.fill();
+    }
+
+    function drawScore() {
+      ctx.fillStyle = 'black';
+      ctx.font = '30px Arial';
+      ctx.fillText('Score: ' + Math.floor(score), 10, 40);
+    }
+
+    function draw() {
+      if (!gameRunning) {
+        return;
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw background
+      drawBackground();
+
+      // Draw bird
+      drawBird();
+
+      // Update bird position
+      bird.velocity += bird.gravity;
+      bird.y += bird.velocity;
+
+      // Draw pipes
+      for (let i = pipes.length - 1; i >= 0; i--) {
+        pipes[i].x -= pipeSpeed;
+        drawPipe(pipes[i].x, pipes[i].height);
+        drawBottomPipe(pipes[i].x, pipes[i].height + pipeGap);
+
+        // Check for collision with pipes
+        if (
+          (bird.x < pipes[i].x + pipeWidth && bird.x + bird.width > pipes[i].x) &&
+          (bird.y < pipes[i].height || bird.y + bird.height > pipes[i].height + pipeGap)
+        ) {
+          showGameOverScreen();
+        }
+
+        // Check for passing pipes
+        if (pipes[i].x + pipeWidth < bird.x && !pipes[i].passed) {
+          pipes[i].passed = true;
+          score += difficultyMultiplier;
+        }
+
+        // Remove off-screen pipes
+        if (pipes[i].x + pipeWidth < 0) {
+          pipes.splice(i, 1);
+        }
+      }
+
+      // Draw score
+      drawScore();
+
+      // Check for bird hitting top or bottom
+      if (bird.y < 0 || bird.y + bird.height > canvas.height) {
+        showGameOverScreen();
+      }
+
+      // Update and draw bubbles
+      for (const bubble of bubbles) {
+        bubble.y += bubble.speed;
+
+        if (bubble.y - bubble.radius > canvas.height) {
+          // Respawn the bubble at the top
+          bubble.y = -bubble.radius;
+        }
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    function restartGame() {
+      gameRunning = true;
+      bird.y = canvas.height / 2 - 15;
+      bird.velocity = 0;
+      pipes.length = 0;
+      score = 0;
+      difficultyMultiplier = 1;
+      pipeSpeed = 3;
+      pipeGap = 250;
+      gameOverScreen.style.display = 'none';
+
+      // Reset bubbles
+      bubbles.length = 0;
+      for (let i = 0; i < 20; i++) {
+        bubbles.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          radius: Math.random() * 10 + 5,
+          speed: Math.random() * 2 + 1,
+        });
+      }
+
+      draw();
+    }
+
+    function flap() {
+      bird.velocity = bird.jump;
+    }
+
+    function descend() {
+      bird.velocity = bird.descent;
+    }
+
+    function createPipe() {
+      const height = Math.floor(Math.random() * (maxPipeHeight - minPipeHeight + 1) + minPipeHeight);
+      pipes.push({ x: canvas.width, height, passed: false });
+    }
+
+    function showGameOverScreen() {
+      gameRunning = false;
+      gameOverScreen.style.display = 'grid';
+      scoreText.textContent = 'Your score is : ' + Math.floor(score);
+    }
+
+    document.addEventListener('keydown', function (event) {
+      if (event.code === 'Space') {
+        flap();
+      } else if (event.code === 'ArrowDown') {
+        descend();
+      }
+    });
+
+    document.addEventListener('click', flap);
+
+    // Initialize bubbles
+    for (let i = 0; i < 20; i++) {
+      bubbles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        radius: Math.random() * 10 + 5,
+        speed: Math.random() * 2 + 1,
+      });
+    }
+
+    draw();
+  </script>
+</body>
+</html>
