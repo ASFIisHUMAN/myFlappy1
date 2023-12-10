@@ -40,11 +40,33 @@
       border: none;
       color: rgb(217, 243, 247);
       font-size: larger;
+      cursor: pointer;
     }
     #scoreText{
       font-weight: 400;
       font-size: x-large;
       color: rgb(5, 80, 11);
+    }
+    .b3{
+      text-align: center;
+    }
+    .b33{
+      font-size: x-large;
+      color: rgb(248, 249, 218);
+      text-decoration: none;
+      text-shadow: 2px 2px rgb(88, 80, 80);
+    }
+    .b33:hover{
+      font-size: xx-large;
+      color: lightgreen;
+      background-image: linear-gradient(to bottom right,rgb(194, 251, 194),rgb(162, 205, 255));
+      border-radius: 8px;
+      
+    }
+    .b22{
+      text-align: center;
+     text-shadow: 2px 2px rgb(85, 78, 78);
+     color: rgb(176, 207, 255);
     }
   </style>
 </head>
@@ -52,6 +74,8 @@
   <canvas id="backgroundCanvas"></canvas>
   <canvas id="gameCanvas"></canvas>
   <div id="gameOverScreen">
+    <b class="b2"><p><h3 class="b22">Creator : ASFI</h3></p></b>
+    <p class="b3"><a class="b33" href="https://www.fiverr.com/s/ej2vPm">Contact for work.</a></p>
     <b><i><h1>Game Over!</h1><h3> Better luck next time...</h3></i></b>
     <i><p id="scoreText"></p></i>
     <button class="btov" onclick="restartGame()"><i>Restart</i></button>
@@ -114,6 +138,9 @@
           flap();
         } else if (event.code === 'ArrowDown') {
           descend();
+        }
+        if( gameOverScreen.style.display === 'grid' && event.code === 'Enter'){
+          restartGame();
         }
       });
 
